@@ -1,0 +1,105 @@
+services:
+  app:
+    build:
+      context: ./backend
+      dockerfile: docker/php/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./backend:/var/www/html
+    environment:
+      APP_NAME: Field Notes API
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8080
+      FRONTEND_URL: http://localhost:5173
+      FRONTEND_URLS: http://localhost:5173,http://localhost:8080
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: field_notes
+      DB_USERNAME: field_notes
+      DB_PASSWORD: field_notes
+      SESSION_DRIVER: database
+      SESSION_DOMAIN: localhost
+      SESSION_SECURE_COOKIE: "false"
+      SESSION_SAME_SITE: lax
+      SANCTUM_STATEFUL_DOMAINS: localhost:5173,localhost:8080,127.0.0.1:5173,127.0.0.1:8080
+      FILESYSTEM_DISK: s3
+      AWS_ACCESS_KEY_ID: fieldnotes
+      AWS_SECRET_ACCESS_KEY: local-minio-password
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_BUCKET: portfolio
+      AWS_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: http://localhost:9000
+      MINIO_PUBLIC_URL: http://localhost:9000/portfolio
+      ADMIN_NAME: Dara Sovann
+      ADMIN_EMAIL: portfolio.owner@example.com
+      ADMIN_PASSWORD: peaceful123
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: http://localhost:8080/api/auth/google/callback
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./backend:/var/www/html:ro
+      - ./backend/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: field_notes
+      POSTGRES_USER: field_notes
+      POSTGRES_PASSWORD: field_notes
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U field_notes -d field_notes"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: fieldnotes
+      MINIO_ROOT_PASSWORD: local-minio-password
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: >-
+      mc alias set local http://minio:9000 fieldnotes local-minio-password &&
+      mc mb --ignore-existing local/portfolio &&
+      mc anonymous set download local/portfolio
+
+volumes:
+  postgres-data:
+  minio-data:

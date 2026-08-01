@@ -1,42 +1,47 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
-import supabase from '../lib/supabase';
+import { api, type AuthUser } from '../lib/api';
 
 interface AuthValue {
-  user: User | null;
-  session: Session | null;
+  user: AuthUser | null;
   loading: boolean;
   isAdmin: boolean;
+  refresh: () => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthValue>({ user: null, session: null, loading: true, isAdmin: false });
-const ADMIN_EMAIL = 'portfolio.owner@example.com';
+const AuthContext = createContext<AuthValue>({ user: null, loading: true, isAdmin: false, refresh: async () => undefined, signOut: async () => undefined });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const refresh = async () => {
+    try {
+      const data = await api.auth.me();
+      setUser(data.user);
+    } catch {
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
-      setLoading(false);
-    });
-    return () => subscription.unsubscribe();
+    refresh();
   }, []);
+
+  const signOut = async () => {
+    await api.auth.logout();
+    setUser(null);
+  };
 
   const value = useMemo(() => ({
     user,
-    session,
     loading,
-    isAdmin: user?.email?.toLowerCase() === ADMIN_EMAIL,
-  }), [user, session, loading]);
+    isAdmin: user?.role === 'admin',
+    refresh,
+    signOut,
+  }), [user, loading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -3,7 +3,7 @@ import { ArrowRight, CircleUserRound, Eye, EyeOff, Leaf } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { signInWithGoogle } from '../lib/googleAuth';
-import supabase from '../lib/supabase';
+import { api } from '../lib/api';
 
 export default function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
   const isSignup = mode === 'signup';
@@ -12,7 +12,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -25,20 +25,21 @@ export default function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
     if (!/^\S+@\S+\.\S+$/.test(form.email)) return setError('Please enter a valid email address.');
     if (form.password.length < 6) return setError('Your password needs at least six characters.');
     setBusy(true);
-    const result = isSignup
-      ? await supabase.auth.signUp({ email: form.email, password: form.password, options: { data: { full_name: form.name.trim() } } })
-      : await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
-    setBusy(false);
-    if (result.error) return setError(result.error.message);
-    if (isSignup && !result.data.session) setNotice('Your account is ready. Check your inbox to confirm your email, then come back in.');
-    else navigate('/chat');
+    try {
+      if (isSignup) await api.auth.register(form.name.trim(), form.email, form.password);
+      else await api.auth.login(form.email, form.password);
+      await refresh();
+      navigate('/chat');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'We could not open your account.');
+    } finally { setBusy(false); }
   };
 
   const resetPassword = async () => {
     setError(''); setNotice('');
     if (!/^\S+@\S+\.\S+$/.test(form.email)) return setError('Enter your email first, and we’ll send a reset link.');
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(form.email, { redirectTo: window.location.origin + '/login' });
-    if (resetError) setError(resetError.message); else setNotice('A password reset link is on its way.');
+    try { await api.auth.forgotPassword(form.email); setNotice('A password reset link is on its way.'); }
+    catch (err) { setError(err instanceof Error ? err.message : 'We could not send a reset link.'); }
   };
 
   return (
@@ -61,7 +62,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
           <button disabled={busy} className="btn-primary w-full justify-center disabled:opacity-60">{busy ? 'Opening the door…' : isSignup ? 'Create account' : 'Sign in'} {!busy && <ArrowRight size={17} />}</button>
         </form>
         <div className="my-6 flex items-center gap-3"><span className="h-px flex-1 bg-[#6E7C52]/15" /><span className="font-mono text-[9px] uppercase tracking-[.16em] text-[#7A8275]">or</span><span className="h-px flex-1 bg-[#6E7C52]/15" /></div>
-        <button onClick={() => { if (!signInWithGoogle('Field Notes')) setError('Google sign-in is not available right now. Please use email instead.'); }} className="btn-outline w-full justify-center"><CircleUserRound size={17} /> Continue with Google</button>
+        <button onClick={() => { if (!signInWithGoogle()) setError('Google sign-in is not available right now. Please use email instead.'); }} className="btn-outline w-full justify-center"><CircleUserRound size={17} /> Continue with Google</button>
         <p className="mt-7 text-center text-sm text-[#687064]">{isSignup ? 'Already have an account?' : 'New here?'} <Link className="font-medium text-[#5C7A89] hover:underline" to={isSignup ? '/login' : '/signup'}>{isSignup ? 'Sign in' : 'Create an account'}</Link></p>
       </div>
     </div>

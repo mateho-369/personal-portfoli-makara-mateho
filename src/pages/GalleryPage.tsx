@@ -4,21 +4,13 @@ import { Check, Eye, EyeOff, Image as ImageIcon, LoaderCircle, Play, Star, Trash
 import { useAuth } from '../contexts/AuthContext';
 import type { MediaItem } from '../types';
 import LoadingState from '../components/LoadingState';
+import { api } from '../lib/api';
 
 const filters = ['All', 'Photos', 'Videos', 'Favorites'] as const;
 const aspectClass: Record<string, string> = { portrait: 'aspect-[4/5]', landscape: 'aspect-[4/3]', square: 'aspect-square' };
 
-async function fileToBase64(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 export default function GalleryPage() {
-  const { isAdmin, session } = useAuth();
+  const { isAdmin } = useAuth();
   const [items, setItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -33,13 +25,11 @@ export default function GalleryPage() {
   const fetchMedia = useCallback(async () => {
     setError('');
     try {
-      const res = await fetch(`/api/media${isAdmin && manage ? '?manage=true' : ''}`, { headers: session ? { Authorization: `Bearer ${session.access_token}` } : {} });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not load the gallery.');
+      const data = await api.media.list(isAdmin && manage);
       setItems(data);
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not load the gallery.'); }
     finally { setLoading(false); }
-  }, [isAdmin, manage, session]);
+  }, [isAdmin, manage]);
 
   useEffect(() => { setLoading(true); fetchMedia(); }, [fetchMedia]);
 
@@ -56,15 +46,11 @@ export default function GalleryPage() {
     if (file.size > 4 * 1024 * 1024) return setError('Please choose a file smaller than 4 MB.');
     setUploading(true); setProgress(18); setError('');
     try {
-      const fileBase64 = await fileToBase64(file); setProgress(42);
-      const uploadRes = await fetch('/api/upload', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ fileName: file.name, fileBase64, contentType: file.type }) });
-      const uploaded = await uploadRes.json();
-      if (!uploadRes.ok) throw new Error(uploaded.error || 'Upload failed.');
+      setProgress(36);
+      const uploaded = await api.uploads.file(file, 'media');
       setProgress(76);
       const sizeLabel = file.size > 1048576 ? `${(file.size / 1048576).toFixed(1)} MB` : `${Math.ceil(file.size / 1024)} KB`;
-      const mediaRes = await fetch('/api/media', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ ...form, media_type: file.type.startsWith('video/') ? 'video' : 'photo', thumbnail_url: uploaded.url, media_url: uploaded.url, size_label: sizeLabel, aspect_ratio: 'landscape', captured_at: new Date().toISOString(), is_favorite: false, is_public: true }) });
-      const created = await mediaRes.json();
-      if (!mediaRes.ok) throw new Error(created.error || 'Could not save media.');
+      await api.media.create({ ...form, media_type: file.type.startsWith('video/') ? 'video' : 'photo', thumbnail_url: uploaded.url, media_url: uploaded.url, size_label: sizeLabel, aspect_ratio: 'landscape', captured_at: new Date().toISOString(), is_favorite: false, is_public: true });
       setProgress(100); setForm({ title: '', description: '', category: 'Field Notes' });
       if (fileRef.current) fileRef.current.value = '';
       await fetchMedia();
@@ -74,18 +60,14 @@ export default function GalleryPage() {
 
   const updateMedia = async (id: number, patch: Partial<MediaItem>) => {
     setError('');
-    const res = await fetch('/api/media', { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ id, ...patch }) });
-    const data = await res.json();
-    if (!res.ok) return setError(data.error || 'Could not update this item.');
-    await fetchMedia();
+    try { await api.media.update(id, patch); await fetchMedia(); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Could not update this item.'); }
   };
 
   const deleteMedia = async (id: number) => {
     if (!window.confirm('Remove this piece from the gallery?')) return;
-    const res = await fetch('/api/media', { method: 'DELETE', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ id }) });
-    const data = await res.json();
-    if (!res.ok) return setError(data.error || 'Could not remove this item.');
-    await fetchMedia();
+    try { await api.media.remove(id); await fetchMedia(); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Could not remove this item.'); }
   };
 
   return (

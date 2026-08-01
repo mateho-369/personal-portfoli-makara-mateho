@@ -2,13 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, FileText, Inbox, LoaderCircle, MessageCircle, Paperclip, Search, Send } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import supabase from '../lib/supabase';
+import { api } from '../lib/api';
 import type { Conversation, Message, Profile } from '../types';
 import LoadingState from '../components/LoadingState';
-
-async function fileToBase64(file: File) {
-  return new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = reject; reader.readAsDataURL(file); });
-}
 
 function relativeTime(value: string) {
   const seconds = Math.floor((Date.now() - new Date(value).getTime()) / 1000);
@@ -19,7 +15,7 @@ function relativeTime(value: string) {
 }
 
 export default function ChatPage() {
-  const { user, session, isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selected, setSelected] = useState<Conversation | null>(null);
@@ -34,47 +30,39 @@ export default function ChatPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const headers = useCallback(() => ({ Authorization: `Bearer ${session?.access_token}` }), [session]);
   const fetchMessages = useCallback(async (conversationId: number) => {
-    const res = await fetch(`/api/messages?conversationId=${conversationId}`, { headers: headers() });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Could not load messages.');
+    const data = await api.messages.list(conversationId);
     setMessages(data);
-  }, [headers]);
+  }, []);
 
   const fetchConversations = useCallback(async () => {
-    if (!session || !user) return;
+    if (!user) return;
     try {
-      const res = await fetch('/api/conversations', { headers: headers() });
-      let data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not open conversations.');
+      let data = await api.conversations.list(isAdmin);
       if (!isAdmin && data.length === 0) {
-        const createRes = await fetch('/api/conversations', { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
-        const created = await createRes.json();
-        if (!createRes.ok) throw new Error(created.error || 'Could not begin a conversation.');
+        const created = await api.conversations.create();
         data = [created];
       }
       setConversations(data);
       setSelected((current) => current ? data.find((item: Conversation) => item.id === current.id) || data[0] || null : data[0] || null);
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not open conversations.'); }
     finally { setLoading(false); }
-  }, [headers, isAdmin, session, user]);
+  }, [isAdmin, user]);
 
-  useEffect(() => { fetch('/api/profile').then((res) => res.json()).then(setProfile).catch(() => null); fetchConversations(); }, [fetchConversations]);
+  useEffect(() => { api.profile.get().then(setProfile).catch(() => null); fetchConversations(); }, [fetchConversations]);
   useEffect(() => { if (selected) fetchMessages(selected.id).catch((err) => setError(err.message)); else setMessages([]); }, [selected?.id, fetchMessages]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   useEffect(() => {
     if (!selected) return;
-    const channel = supabase.channel(`messages-${selected.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selected.id}` }, () => fetchMessages(selected.id)).subscribe();
     const poll = window.setInterval(() => fetchMessages(selected.id).catch(() => null), 6000);
-    return () => { supabase.removeChannel(channel); window.clearInterval(poll); };
+    return () => window.clearInterval(poll);
   }, [selected?.id, fetchMessages]);
 
   const chooseConversation = async (conversation: Conversation) => {
     setSelected(conversation);
     if (isAdmin && conversation.unread_count > 0) {
-      await fetch('/api/conversations', { method: 'PUT', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify({ id: conversation.id, unread_count: 0 }) });
+      await api.conversations.markRead(conversation.id);
       fetchConversations();
     }
   };
@@ -83,9 +71,7 @@ export default function ChatPage() {
     if (!selected || (!draft.trim() && !attachment)) return;
     setSending(true); setError('');
     try {
-      const res = await fetch('/api/messages', { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify({ conversation_id: selected.id, body: draft.trim(), attachment_url: attachment || null }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'The message could not be sent.');
+      await api.messages.send(selected.id, draft.trim(), attachment || null);
       setDraft(''); setAttachment(''); await fetchMessages(selected.id); await fetchConversations();
     } catch (err) { setError(err instanceof Error ? err.message : 'The message could not be sent.'); }
     finally { setSending(false); }
@@ -96,11 +82,8 @@ export default function ChatPage() {
     if (file.size > 4 * 1024 * 1024) return setError('Attachments must be smaller than 4 MB.');
     setUploading(true); setError('');
     try {
-      const fileBase64 = await fileToBase64(file);
-      const res = await fetch('/api/chat-upload', { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName: file.name, fileBase64, contentType: file.type }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Attachment upload failed.');
-      setAttachment(data.url);
+      const uploaded = await api.uploads.file(file, 'chat');
+      setAttachment(uploaded.url);
     } catch (err) { setError(err instanceof Error ? err.message : 'Attachment upload failed.'); }
     finally { setUploading(false); if (fileRef.current) fileRef.current.value = ''; }
   };
@@ -129,7 +112,7 @@ export default function ChatPage() {
             <div className="flex-1 space-y-5 overflow-y-auto bg-[radial-gradient(circle_at_50%_0%,rgba(217,164,65,.055),transparent_42%)] p-4 sm:p-7">
               {messages.length === 0 && <div className="mx-auto max-w-sm py-20 text-center"><MessageCircle className="mx-auto text-[#6E7C52]" size={25} /><h3 className="mt-4 font-serif text-2xl">Begin with a simple hello.</h3><p className="mt-2 text-sm leading-relaxed text-[#737B6F]">This is a small, private space for a thoughtful conversation.</p></div>}
               <AnimatePresence initial={false}>{messages.map((message) => {
-                const mine = message.sender_id === user?.id;
+                const mine = message.sender_id === String(user?.id);
                 return <motion.div key={message.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[82%] sm:max-w-[68%] ${mine ? 'text-right' : 'text-left'}`}><div className={`message-bubble ${mine ? 'message-mine' : 'message-theirs'}`}>{message.body && <p className="whitespace-pre-wrap">{message.body}</p>}{message.attachment_url && <a href={message.attachment_url} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 rounded-lg bg-[#F8F4E9]/50 p-2 text-sm underline"><FileText size={16} /> View attachment</a>}</div><time className="mt-1.5 block px-1 font-mono text-[8px] uppercase tracking-[.1em] text-[#858C81]">{new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div></motion.div>;
               })}</AnimatePresence><div ref={bottomRef} />
             </div>

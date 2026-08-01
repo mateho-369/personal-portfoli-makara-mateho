@@ -4,6 +4,7 @@ import { ArrowDown, ArrowRight, BookOpen, Camera, Coffee, Code2, Compass, Heart,
 import { Link, useLocation } from 'react-router-dom';
 import type { Favorite, MediaItem, Profile } from '../types';
 import LoadingState from '../components/LoadingState';
+import { api } from '../lib/api';
 
 const favoriteIcons: Record<string, typeof Leaf> = { leaf: Leaf, camera: Camera, coffee: Coffee, code: Code2, compass: Compass, mountain: Mountain, music: Music, book: BookOpen };
 const reveal = { initial: { opacity: 0, y: 14 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, amount: 0.18 }, transition: { duration: 0.7, ease: 'easeOut' as const } };
@@ -18,9 +19,9 @@ export default function HomePage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/profile').then((res) => { if (!res.ok) throw new Error('Could not load the profile'); return res.json(); }),
-      fetch('/api/favorites').then((res) => { if (!res.ok) throw new Error('Could not load favorites'); return res.json(); }),
-      fetch('/api/media').then((res) => { if (!res.ok) throw new Error('Could not load the gallery'); return res.json(); }),
+      api.profile.get(),
+      api.favorites.list(),
+      api.media.list(),
     ]).then(([profileData, favoriteData, mediaData]) => {
       setProfile(profileData); setFavorites(favoriteData); setMedia(mediaData);
     }).catch((err) => setError(err.message || 'The page could not be loaded.')).finally(() => setLoading(false));

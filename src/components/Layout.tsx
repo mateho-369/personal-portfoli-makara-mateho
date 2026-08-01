@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Github, Instagram, LogOut, Mail, Menu, MessageCircle, X } from 'lucide-react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import supabase from '../lib/supabase';
+import { api } from '../lib/api';
 import type { Profile } from '../types';
 import Logo from './Logo';
 
@@ -11,17 +11,15 @@ const iconFor = (name: string) => name === 'github' ? Github : name === 'instagr
 export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, signOut } = useAuth();
   const location = useLocation();
 
   useEffect(() => {
-    fetch('/api/profile').then((res) => res.ok ? res.json() : null).then(setProfile).catch(() => null);
+    api.profile.get().then(setProfile).catch(() => null);
   }, []);
   useEffect(() => setMenuOpen(false), [location.pathname]);
 
   const navClass = ({ isActive }: { isActive: boolean }) => `nav-link ${isActive ? 'nav-link-active' : ''}`;
-  const signOut = async () => { await supabase.auth.signOut(); };
-
   return (
     <div className="min-h-screen bg-[#EEF2EA] text-[#2B3328]">
       <div className="fixed left-0 top-0 z-[70] h-[2px] w-full bg-gradient-to-r from-[#6E7C52] via-[#D9A441] to-[#5C7A89]" />
