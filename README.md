@@ -14,22 +14,29 @@ A peaceful personal portfolio and media journal using the original **Hopecore Pe
 ## Run locally
 
 ```bash
-# Build the API, database, and object storage
-docker compose up --build
+# Build and start React, Laravel, PostgreSQL, and MinIO together
+docker compose up --build -d
 
-# In a second terminal, run the unchanged React interface
-npm install
-VITE_API_URL=http://localhost:8080 npm run dev
+# Exercise registration, login, chat writes, owner inbox, MinIO upload,
+# and media create/update/delete through the same frontend origin
+sh scripts/smoke-test.sh
 ```
 
 Services:
 
-- React: `http://localhost:5173`
+- Complete application: `http://localhost:5173`
 - Laravel API: `http://localhost:8080`
 - MinIO API: `http://localhost:9000`
 - MinIO console: `http://localhost:9001`
 
-The Laravel container automatically runs migrations and seeds the portfolio. The local owner account defaults to `portfolio.owner@example.com` / `peaceful123`; override it with `ADMIN_EMAIL` and `ADMIN_PASSWORD` before production.
+The frontend Nginx container proxies `/api` and `/sanctum` to Laravel, so Sanctum cookies are same-origin and no local CORS workarounds are needed. The Laravel container automatically runs migrations and seeds the portfolio. The local owner account defaults to `portfolio.owner@example.com` / `peaceful123`; override it with `ADMIN_EMAIL` and `ADMIN_PASSWORD` before production.
+
+To watch logs or reset all test data:
+
+```bash
+docker compose logs -f frontend nginx app minio
+docker compose down -v
+```
 
 ## Configuration
 

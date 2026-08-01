@@ -1,16 +1,26 @@
 services:
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      nginx:
+        condition: service_started
+
   app:
     build:
       context: ./backend
       dockerfile: docker/php/Dockerfile
     restart: unless-stopped
-    volumes:
-      - ./backend:/var/www/html
     environment:
       APP_NAME: Field Notes API
       APP_ENV: local
       APP_DEBUG: "true"
-      APP_URL: http://localhost:8080
+      APP_KEY: base64:ZmllbGQtbm90ZXMtbG9jYWwta2V5LWNoYW5nZS1tZSE=
+      APP_URL: http://localhost:5173
       FRONTEND_URL: http://localhost:5173
       FRONTEND_URLS: http://localhost:5173,http://localhost:8080
       DB_CONNECTION: pgsql
@@ -20,7 +30,6 @@ services:
       DB_USERNAME: field_notes
       DB_PASSWORD: field_notes
       SESSION_DRIVER: database
-      SESSION_DOMAIN: localhost
       SESSION_SECURE_COOKIE: "false"
       SESSION_SAME_SITE: lax
       SANCTUM_STATEFUL_DOMAINS: localhost:5173,localhost:8080,127.0.0.1:5173,127.0.0.1:8080
@@ -37,7 +46,7 @@ services:
       ADMIN_PASSWORD: peaceful123
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      GOOGLE_REDIRECT_URI: http://localhost:8080/api/auth/google/callback
+      GOOGLE_REDIRECT_URI: http://localhost:5173/api/auth/google/callback
     depends_on:
       postgres:
         condition: service_healthy

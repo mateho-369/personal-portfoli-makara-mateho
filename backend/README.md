@@ -4,12 +4,13 @@ Laravel 12 REST API with Sanctum session auth, Socialite Google login, PostgreSQ
 
 ## Local start
 
-From the repository root:
+From the repository root, the single Compose command starts the frontend and every backend dependency:
 
 ```bash
-docker compose up --build
+docker compose up --build -d
+sh scripts/smoke-test.sh
 ```
 
-The API is served at `http://localhost:8080`, MinIO at `http://localhost:9000`, and the MinIO console at `http://localhost:9001`. Run the Vite frontend with `VITE_API_URL=http://localhost:8080 npm run dev`.
+The complete app is served at `http://localhost:5173`, the API is also available directly at `http://localhost:8080`, MinIO at `http://localhost:9000`, and the MinIO console at `http://localhost:9001`.
 
 The compose entrypoint migrates and seeds the database. Change all passwords and OAuth settings before production deployment.
