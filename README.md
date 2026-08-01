@@ -7,14 +7,14 @@ A peaceful personal portfolio and media journal using the original **Hopecore Pe
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS 4
 - **API:** Laravel 12 REST API in `/backend`
 - **Authentication:** Laravel Sanctum SPA sessions plus Socialite Google OAuth
-- **Database:** PostgreSQL
+- **Database:** MySQL 8.4
 - **Media storage:** MinIO through Laravel's S3 filesystem, with browser-to-MinIO presigned uploads
-- **Local services:** Docker Compose, PHP-FPM, Nginx, PostgreSQL, MinIO
+- **Local services:** Docker Compose, PHP-FPM, Nginx, MySQL, MinIO
 
 ## Run locally
 
 ```bash
-# Build and start React, Laravel, PostgreSQL, and MinIO together
+# Build and start React, Laravel, MySQL, and MinIO together
 docker compose up --build -d
 
 # Exercise registration, login, chat writes, owner inbox, MinIO upload,
@@ -26,6 +26,7 @@ Services:
 
 - Complete application: `http://localhost:5173`
 - Laravel API: `http://localhost:8080`
+- MySQL: `localhost:3306` (`field_notes` / `field_notes` for local testing)
 - MinIO API: `http://localhost:9000`
 - MinIO console: `http://localhost:9001`
 

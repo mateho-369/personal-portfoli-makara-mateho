@@ -1,6 +1,6 @@
 # Field Notes Laravel API
 
-Laravel 12 REST API with Sanctum session auth, Socialite Google login, PostgreSQL, and direct-to-MinIO presigned uploads.
+Laravel 12 REST API with Sanctum session auth, Socialite Google login, MySQL 8.4, and direct-to-MinIO presigned uploads.
 
 ## Local start
 

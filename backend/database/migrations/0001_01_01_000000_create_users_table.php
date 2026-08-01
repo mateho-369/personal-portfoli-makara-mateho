@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -14,14 +13,12 @@ return new class extends Migration {
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->string('role', 20)->default('visitor')->index();
+            $table->string('admin_lock', 20)->nullable()->storedAs("case when `role` = 'admin' then 'admin' else null end")->unique();
             $table->string('google_id')->nullable()->unique();
             $table->text('avatar_url')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
-        if (DB::getDriverName() === 'pgsql') {
-            DB::statement("CREATE UNIQUE INDEX users_single_admin ON users ((role)) WHERE role = 'admin'");
-        }
         Schema::create('password_reset_tokens', function (Blueprint $table): void {
             $table->string('email')->primary();
             $table->string('token');

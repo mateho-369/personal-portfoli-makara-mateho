@@ -106,4 +106,4 @@ if curl -fsS "$PUBLIC_URL" >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "All tests passed: frontend proxy, Sanctum auth, PostgreSQL writes, chat, admin authorization, and MinIO uploads work together."
+echo "All tests passed: frontend proxy, Sanctum auth, MySQL writes, chat, admin authorization, and MinIO uploads work together."
