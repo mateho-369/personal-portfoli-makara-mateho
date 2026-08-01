@@ -38,6 +38,12 @@ async function request<T>(path: string, options: ApiOptions = {}): Promise<T> {
   if (response.status === 204) return undefined as T;
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status === 404 && path.startsWith('/api/')) {
+      throw new Error('The Laravel API is not available. Start the complete stack with: docker compose up --build -d');
+    }
+    if (response.status >= 500) {
+      throw new Error(data.error || data.message || 'The Laravel API could not reach MySQL or MinIO. Check docker compose logs app mysql minio.');
+    }
     const firstValidation = data.errors ? Object.values(data.errors).flat()[0] : null;
     throw new Error(String(firstValidation || data.error || data.message || 'Something went wrong.'));
   }
@@ -45,6 +51,9 @@ async function request<T>(path: string, options: ApiOptions = {}): Promise<T> {
 }
 
 export const api = {
+  system: {
+    status: () => request<{ ok: boolean; database_driver: string; checks: Record<string, boolean> }>('/api/status', { csrf: false }),
+  },
   profile: {
     get: () => request<Profile>('/api/profile', { csrf: false }),
     update: (patch: Partial<Profile>) => request<Profile>('/api/admin/profile', { method: 'PUT', body: patch }),

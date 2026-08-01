@@ -6,10 +6,12 @@ use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SystemController;
 use App\Http\Controllers\UploadController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/profile', [ProfileController::class, 'show']);
+Route::get('/status', [SystemController::class, 'status']);
 Route::get('/favorites', [FavoriteController::class, 'index']);
 Route::get('/media', [MediaController::class, 'index']);
 

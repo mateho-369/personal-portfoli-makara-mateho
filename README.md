@@ -22,6 +22,13 @@ docker compose up --build -d
 sh scripts/smoke-test.sh
 ```
 
+If you previously ran an older database container, reset the old Compose volumes once before starting MySQL:
+
+```bash
+docker compose down -v
+docker compose up --build -d
+```
+
 Services:
 
 - Complete application: `http://localhost:5173`
@@ -31,6 +38,8 @@ Services:
 - MinIO console: `http://localhost:9001`
 
 The frontend Nginx container proxies `/api` and `/sanctum` to Laravel, so Sanctum cookies are same-origin and no local CORS workarounds are needed. The Laravel container automatically runs migrations and seeds the portfolio. The local owner account defaults to `portfolio.owner@example.com` / `peaceful123`; override it with `ADMIN_EMAIL` and `ADMIN_PASSWORD` before production.
+
+When running `npm run dev` outside Docker, Vite also proxies `/api`, `/sanctum`, and `/up` to `http://localhost:8080`, so login continues to use the same-origin Sanctum flow.
 
 To watch logs or reset all test data:
 

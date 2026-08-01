@@ -58,7 +58,10 @@ for attempt in $(seq 1 60); do
   sleep 2
 done
 
-echo "1/7 Public profile and gallery"
+echo "1/7 Laravel, MySQL, MinIO, public profile, and gallery"
+STATUS="$(curl -fsS -H "Accept: application/json" "$BASE_URL/api/status")"
+printf '%s' "$STATUS" | json_value "['database_driver']" | grep -q '^mysql$'
+printf '%s' "$STATUS" | json_value "['checks']['minio']" | grep -q -E '^(True|true|1)$'
 curl -fsS -H "Accept: application/json" "$BASE_URL/api/profile" | json_value "['display_name']" >/dev/null
 curl -fsS -H "Accept: application/json" "$BASE_URL/api/media" | json_value "[0]['id']" >/dev/null
 

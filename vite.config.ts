@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig(async () => {
   const plugins = [react(), tailwindcss()];
+  const apiTarget = process.env.VITE_API_PROXY_TARGET || 'http://localhost:8080';
   try {
     // @ts-ignore
     const m = await import('./.vite-source-tags.js');
@@ -13,5 +14,12 @@ export default defineConfig(async () => {
 
   return {
     plugins,
+    server: {
+      proxy: {
+        '/api': { target: apiTarget, changeOrigin: true },
+        '/sanctum': { target: apiTarget, changeOrigin: true },
+        '/up': { target: apiTarget, changeOrigin: true },
+      },
+    },
   };
 })
