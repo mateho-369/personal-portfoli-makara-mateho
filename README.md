@@ -1,55 +1,50 @@
 # Field Notes — React + Laravel + MinIO
 
-A peaceful personal portfolio and media journal using the original **Hopecore Peace** React interface with a fully self-hosted Laravel backend.
+A peaceful personal portfolio and media journal.
 
 ## Architecture
 
-- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS 4
-- **API:** Laravel 12 REST API in `/backend`
-- **Authentication:** Laravel Sanctum SPA sessions plus Socialite Google OAuth
-- **Database:** MySQL 8.4
-- **Media storage:** MinIO through Laravel's S3 filesystem, with browser-to-MinIO presigned uploads
-- **Local services:** Docker Compose, PHP-FPM, Nginx, MySQL, MinIO
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS 4 |
+| API | Laravel 12 in `/backend` |
+| Auth | Sanctum SPA sessions + Socialite Google OAuth |
+| Database | **Local:** MySQL 8.4 (Docker) · **Production:** Aiven MySQL (free tier, external) |
+| Storage | MinIO (S3-compatible), browser-to-MinIO presigned uploads |
+| Theme | Light / Dark / System toggle (Hopecore Peace palette) |
 
-## Run locally
-
-```bash
-# Build and start React, Laravel, MySQL, and MinIO together
-docker compose up --build -d
-
-# Exercise registration, login, chat writes, owner inbox, MinIO upload,
-# and media create/update/delete through the same frontend origin
-sh scripts/smoke-test.sh
-```
-
-If you previously ran an older database container, reset the old Compose volumes once before starting MySQL:
+## Local development
 
 ```bash
-docker compose down -v
-docker compose up --build -d
+docker compose up --build -d   # starts React + Laravel + MySQL + MinIO
+sh scripts/smoke-test.sh        # end-to-end verification
 ```
 
 Services:
 
-- Complete application: `http://localhost:5173`
-- Laravel API: `http://localhost:8080`
-- MySQL: `localhost:3306` (`field_notes` / `field_notes` for local testing)
-- MinIO API: `http://localhost:9000`
-- MinIO console: `http://localhost:9001`
+| Service | URL |
+|---|---|
+| Complete app | http://localhost:5173 |
+| Laravel API | http://localhost:8080 |
+| MinIO API | http://localhost:9000 |
+| MinIO console | http://localhost:9001 |
+| MySQL | localhost:3306 |
 
-The frontend Nginx container proxies `/api` and `/sanctum` to Laravel, so Sanctum cookies are same-origin and no local CORS workarounds are needed. The Laravel container automatically runs migrations and seeds the portfolio. The local owner account defaults to `portfolio.owner@example.com` / `peaceful123`; override it with `ADMIN_EMAIL` and `ADMIN_PASSWORD` before production.
+Default owner: `portfolio.owner@example.com` / `peaceful123`
 
-When running `npm run dev` outside Docker, Vite also proxies `/api`, `/sanctum`, and `/up` to `http://localhost:8080`, so login continues to use the same-origin Sanctum flow.
+Reset everything: `docker compose down -v && docker compose up --build -d`
 
-To watch logs or reset all test data:
+## Production deployment on a VM
 
-```bash
-docker compose logs -f frontend nginx app minio
-docker compose down -v
-```
+See the full step-by-step in [docs/production.md](docs/production.md).
+
+Short version:
+1. Create a free **Aiven MySQL** service at aiven.io
+2. Copy `backend/.env.example` → `backend/.env` on the VM and fill in all values
+3. `docker compose -f docker-compose.prod.yml up -d --build`
+4. `docker compose -f docker-compose.prod.yml exec app php artisan migrate --force`
+5. `docker compose -f docker-compose.prod.yml exec app php artisan db:seed --force`
 
 ## Configuration
 
-Copy `backend/.env.example` to `backend/.env` when running Laravel outside Docker. Configure the Google OAuth client and callback through `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI`.
-
-For production, serve the React app and Laravel API on the same parent domain, set `FRONTEND_URL`, `FRONTEND_URLS`, `SANCTUM_STATEFUL_DOMAINS`, and `SESSION_DOMAIN`, and use HTTPS with `SESSION_SECURE_COOKIE=true`.
+See `backend/.env.example` — every variable is documented inline.

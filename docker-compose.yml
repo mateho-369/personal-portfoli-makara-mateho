@@ -1,3 +1,9 @@
+# ── Local development stack ──────────────────────────────────────────────────
+# All 5 services run locally: frontend React, Laravel API, MySQL, MinIO.
+# For production on a VM, use docker-compose.prod.yml instead.
+# Start: docker compose up --build -d
+# Test:  sh scripts/smoke-test.sh
+
 services:
   frontend:
     build:
@@ -21,8 +27,14 @@ services:
       APP_DEBUG: "true"
       APP_KEY: base64:ZmllbGQtbm90ZXMtbG9jYWwta2V5LWNoYW5nZS1tZSE=
       APP_URL: http://localhost:5173
+      APP_LOCALE: en
+      APP_FALLBACK_LOCALE: en
       FRONTEND_URL: http://localhost:5173
       FRONTEND_URLS: http://localhost:5173,http://localhost:8080
+      LOG_CHANNEL: stack
+      LOG_LEVEL: debug
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
       DB_CONNECTION: mysql
       DB_HOST: mysql
       DB_PORT: 3306
@@ -30,6 +42,7 @@ services:
       DB_USERNAME: field_notes
       DB_PASSWORD: field_notes
       SESSION_DRIVER: database
+      SESSION_LIFETIME: 120
       SESSION_SECURE_COOKIE: "false"
       SESSION_SAME_SITE: lax
       SANCTUM_STATEFUL_DOMAINS: localhost:5173,localhost:8080,127.0.0.1:5173,127.0.0.1:8080
